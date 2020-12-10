@@ -15,6 +15,7 @@
 
 // Import commands.js using ES2015 syntax:
 import './commands'
+import ReproduceSteps from './reproSteps';
 
 Cypress.on("uncaught:exception", (err, runnable) => {
   console.debug(">> uncaught:exception disabled in cypress/support/index.js");
@@ -23,6 +24,8 @@ Cypress.on("uncaught:exception", (err, runnable) => {
 
 let isSoftAssertion = false;
 let errors = [];
+let AllErrors = [];
+
 
 chai.softExpect = function ( ...args ) {
     isSoftAssertion = true;
@@ -40,6 +43,8 @@ chai.Assertion.prototype.assert = function (...args) {
             origAssert.call(this, ...args)
         } catch ( error ) {
             errors.push(error);
+            //fails to assertions block
+            throw new Error(msg);
         }
         isSoftAssertion = false;
     } else {
@@ -50,11 +55,16 @@ chai.Assertion.prototype.assert = function (...args) {
 
 // monkey-patch `Cypress.log` so that the last `cy.then()` isn't logged to command log
 const origLog = Cypress.log;
-Cypress.log = function ( data ) {
-    if ( data && data.error && /soft assertions/i.test(data.error.message) ) {
+Cypress.log = function ( data , fullLog = false ) {
+    if (!fullLog  && data && data.error && /soft assertions/i.test(data.error.message) ) {
         data.error.message = '\n\n\t' + data.error.message + '\n\n';
         throw data.error;
+    } 
+    
+    if(fullLog){
+        console.log(data);
     }
+
     return origLog.call(Cypress, ...arguments);
 };
 
@@ -86,9 +96,9 @@ function itCallback ( func ) {
 }
 
 const origIt = window.it;
-window.it = (title, func) => {
-    origIt(title, func && (() => itCallback(func)));
-};
+// window.it = (title, func) => {
+//     origIt(title, func && (() => itCallback(func)));
+// };
 window.it.only = (title, func) => {
     origIt.only(title, func && (() => itCallback(func)));
 };
@@ -97,11 +107,18 @@ window.it.skip = (title, func) => {
 };
 
 beforeEach(() => {
-    errors = [];
+    //errors = [];
 });
 afterEach(() => {
-    errors = [];
+    cy.log(errors ,true)
+   // errors = [];
     isSoftAssertion = false;
 });
-// Alternatively you can use CommonJS syntax:
-// require('./commands')
+
+// runs once after all tests in the block
+// dev ops ,repor step here
+after(() => {
+    console.log(errors)
+    const reproSteps = new ReproduceSteps(errors , cy);
+
+  })
